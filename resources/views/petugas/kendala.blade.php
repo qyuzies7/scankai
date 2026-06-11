@@ -499,26 +499,45 @@
         const img = await fileToImage(file);
         const ctx = kendalaPhotoCanvas.getContext('2d');
 
-        kendalaPhotoCanvas.width = img.width;
-        kendalaPhotoCanvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
+        const maxWidth = 1280;
+        const maxHeight = 1600;
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+        }
+
+        kendalaPhotoCanvas.width = width;
+        kendalaPhotoCanvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
 
         const stamp = getTimestampText();
-        const barHeight = Math.max(50, Math.floor(img.height * 0.08));
-        const fontSize = Math.max(20, Math.floor(img.width * 0.035));
-        const padding = Math.max(16, Math.floor(img.width * 0.02));
+        const barHeight = Math.max(42, Math.floor(height * 0.08));
+        const fontSize = Math.max(16, Math.floor(width * 0.035));
+        const padding = Math.max(12, Math.floor(width * 0.02));
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.60)';
-        ctx.fillRect(0, img.height - barHeight, img.width, barHeight);
+        ctx.fillRect(0, height - barHeight, width, barHeight);
+
         ctx.fillStyle = '#ffffff';
         ctx.font = `${fontSize}px Arial`;
         ctx.textBaseline = 'middle';
-        ctx.fillText(stamp, padding, img.height - (barHeight / 2));
+        ctx.fillText(stamp, padding, height - (barHeight / 2));
 
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             kendalaPhotoCanvas.toBlob((blob) => {
+                if (!blob) {
+                    reject(new Error('Gagal memproses foto.'));
+                    return;
+                }
+
                 resolve(blob);
-            }, 'image/jpeg', 0.92);
+            }, 'image/jpeg', 0.72);
         });
     }
 
@@ -562,11 +581,17 @@
         if (!files.length) return;
 
         for (const file of files) {
-            const blob = await stampPhoto(file);
-            kendalaFiles.push({
-                blob,
-                previewUrl: URL.createObjectURL(blob),
-            });
+            try {
+                const blob = await stampPhoto(file);
+
+                kendalaFiles.push({
+                    blob,
+                    previewUrl: URL.createObjectURL(blob),
+                });
+            } catch (error) {
+                console.error('Gagal memproses foto kendala:', error);
+                showGlobalError('Gagal memproses foto. Coba ambil ulang foto.');
+            }
         }
 
         this.value = '';
@@ -635,6 +660,8 @@
             return;
         }
 
+        setButtonLoading(kendalaSubmitBtn, true, 'Mengirim...');
+
         const currentLocation = await getCurrentLocation();
 
         const formData = new FormData();
@@ -660,7 +687,6 @@
             });
         }
 
-        setButtonLoading(kendalaSubmitBtn, true, 'Mengirim...');
         try {
             const response = await fetch('/api/laporan-kendala', {
                 method: 'POST',
@@ -670,7 +696,15 @@
                 body: formData
             });
 
-            const result = await response.json().catch(() => ({}));
+            const rawResponse = await response.text();
+
+            let result;
+            try {
+                result = rawResponse ? JSON.parse(rawResponse) : {};
+            } catch (error) {
+                console.error('Response bukan JSON:', rawResponse);
+                throw new Error('Server mengembalikan response tidak valid. Cek ukuran foto atau error backend.');
+            }
 
             if (response.status === 404) {
                 throw new Error('ENDPOINT_KENDALA_NOT_FOUND');
