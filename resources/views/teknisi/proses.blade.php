@@ -193,23 +193,105 @@
         renderPhotoPreviews();
     });
 
+    function fileToImageTeknisi(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = reader.result;
+            };
+
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function compressTeknisiPhoto(file) {
+        const img = await fileToImageTeknisi(file);
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const maxWidth = 1280;
+        const maxHeight = 1600;
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                const compressedFile = new File(
+                    [blob],
+                    file.name.replace(/\.[^/.]+$/, '') + '.jpg',
+                    {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    }
+                );
+
+                resolve(compressedFile);
+            }, 'image/jpeg', 0.72);
+        });
+    }
+
     document.getElementById('finishForm').addEventListener('submit', async function (e) {
         e.preventDefault(); clearGlobalMessages();
         const ket = document.getElementById('keterangan_perbaikan').value.trim();
         if (!ket) { showGlobalError('Keterangan perbaikan wajib diisi.'); return; }
         if (!fotoFiles.length) { showGlobalError('Foto setelah perbaikan wajib diisi.'); return; }
+
+        const btn = document.getElementById('submitBtn');
+        setButtonLoading(btn, true, 'Mengirim...');
+
         const form = new FormData();
         form.append('id_user', petugas.id_user || ''); form.append('nipp', petugas.nipp || '');
         form.append('keterangan_perbaikan', ket);
-        // append all photos as array
+        // append all photos as array with compression
         if (fotoFiles.length) {
-            fotoFiles.forEach((f, i) => form.append('foto_perbaikan[]', f, f.name || `foto_${Date.now()}_${i}.jpg`));
+            for (let i = 0; i < fotoFiles.length; i++) {
+                try {
+                    const compressed = await compressTeknisiPhoto(fotoFiles[i]);
+                    form.append('foto_perbaikan[]', compressed, compressed.name);
+                } catch (error) {
+                    console.error('Gagal kompres foto, kirim file asli:', error);
+                    form.append('foto_perbaikan[]', fotoFiles[i], fotoFiles[i].name || `foto_${Date.now()}_${i}.jpg`);
+                }
+            }
         }
-        const btn = document.getElementById('submitBtn'); setButtonLoading(btn, true, 'Mengirim...');
         try {
-            const response = await fetch(`/api/teknisi/laporan-kendala/${id}/selesai`, { method: 'POST', headers: { 'Accept': 'application/json' }, body: form });
-            const result = await response.json();
-            if (!response.ok || !result.success) throw new Error(result.message || 'Gagal konfirmasi selesai');
+            const response = await fetch(`/api/teknisi/laporan-kendala/${id}/selesai`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: form
+            });
+
+            const rawResponse = await response.text();
+
+            let result;
+            try {
+                result = rawResponse ? JSON.parse(rawResponse) : {};
+            } catch (error) {
+                console.error('Response bukan JSON:', rawResponse);
+                throw new Error('Server mengembalikan response tidak valid. Cek ukuran foto atau error backend.');
+            }
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Gagal konfirmasi selesai');
+            }
             localStorage.setItem('teknisi_selected_kendala', String(id));
             window.location.href = `/teknisi/detail-selesai?id=${id}`;
         } catch (error) { showGlobalError(error.message); }

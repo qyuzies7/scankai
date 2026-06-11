@@ -446,6 +446,7 @@
     const kendalaPhotoGallery = document.getElementById('kendalaPhotoGallery');
     const kendalaSubmitBtn = document.getElementById('kendalaSubmitBtn');
     let kendalaFiles = [];
+    let isKendalaSubmitting = false;
 
     async function getNamaLokasi(lat, lng) {
         try {
@@ -612,16 +613,25 @@
 
     document.getElementById('kendalaForm').addEventListener('submit', async function (e) {
         e.preventDefault();
+        
+        // Cegah submit dobel
+        if (isKendalaSubmitting) {
+            return;
+        }
+        isKendalaSubmitting = true;
+        
         clearGlobalMessages();
         const petugas = JSON.parse(localStorage.getItem('petugas'));
         if (!petugas) {
             showGlobalError('Data petugas tidak ditemukan.');
+            isKendalaSubmitting = false;
             return;
         }
 
         const jenisKendala = document.getElementById('jenis_kendala').value;
         if (!jenisKendala) {
             showGlobalError('Pilih jenis kendala terlebih dahulu.');
+            isKendalaSubmitting = false;
             return;
         }
 
@@ -638,6 +648,7 @@
         formData.append('stanformasi', gerbongManual);
         formData.append('gerbong_ka', gerbongManual);
         formData.append('tingkat_kendala', 'rusak');
+        formData.append('sumber_laporan', 'manual');
         formData.append('catatan', document.getElementById('kendala_catatan').value.trim());
         formData.append('gps_lat', currentLocation.gps_lat);
         formData.append('gps_lng', currentLocation.gps_lng);
@@ -679,6 +690,7 @@
             console.error(error);
         } finally {
             setButtonLoading(kendalaSubmitBtn, false);
+            isKendalaSubmitting = false;
         }
     });
 
