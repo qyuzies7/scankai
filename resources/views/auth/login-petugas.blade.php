@@ -15,8 +15,11 @@
                 <input type="text" id="username" class="form-control" placeholder="Username" required>
             </div>
 
-            <div class="form-group">
+            <div class="form-group password-group" style="position:relative;">
                 <input type="password" id="password" class="form-control" placeholder="Password" required>
+                <button type="button" id="togglePassword" class="toggle-password" aria-label="Tampilkan password" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); border:none; background:transparent; cursor:pointer; padding:4px; font-size:18px; display:flex; align-items:center; justify-content:center;">
+                    <iconify-icon id="togglePasswordIcon" icon="mdi:eye" style="font-size:20px;"></iconify-icon>
+                </button>
             </div>
 
             <button type="submit" class="btn-login" id="loginButton">
@@ -30,6 +33,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
 <script>
     function setLoginLoading(button, isLoading) {
         if (!button) return;
@@ -85,5 +89,21 @@
             setLoginLoading(loginButton, false);
         }
     });
+
+    // Toggle show/hide password using Iconify eye/eye-off
+    (function() {
+        const toggleBtn = document.getElementById('togglePassword');
+        const pwd = document.getElementById('password');
+        if (!toggleBtn || !pwd) return;
+
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isPassword = pwd.type === 'password';
+            pwd.type = isPassword ? 'text' : 'password';
+            const iconEl = document.getElementById('togglePasswordIcon');
+            if (iconEl) iconEl.setAttribute('icon', isPassword ? 'mdi:eye-off' : 'mdi:eye');
+            toggleBtn.setAttribute('aria-label', isPassword ? 'Sembunyikan password' : 'Tampilkan password');
+        });
+    })();
 </script>
 @endpush
