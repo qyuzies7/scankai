@@ -18,7 +18,7 @@
             <div class="form-group password-group" style="position:relative;">
                 <input type="password" id="password" class="form-control" placeholder="Password" required>
                 <button type="button" id="togglePassword" class="toggle-password" aria-label="Tampilkan password" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); border:none; background:transparent; cursor:pointer; padding:4px; font-size:18px; display:flex; align-items:center; justify-content:center;">
-                    <iconify-icon id="togglePasswordIcon" icon="mdi:eye" style="font-size:20px;"></iconify-icon>
+                    <iconify-icon id="togglePasswordIcon" icon="mdi:eye-off" style="font-size:20px;"></iconify-icon>
                 </button>
             </div>
 
@@ -90,7 +90,7 @@
         }
     });
 
-    // Toggle show/hide password using Iconify eye/eye-off
+
     (function() {
         const toggleBtn = document.getElementById('togglePassword');
         const pwd = document.getElementById('password');
@@ -101,7 +101,7 @@
             const isPassword = pwd.type === 'password';
             pwd.type = isPassword ? 'text' : 'password';
             const iconEl = document.getElementById('togglePasswordIcon');
-            if (iconEl) iconEl.setAttribute('icon', isPassword ? 'mdi:eye-off' : 'mdi:eye');
+            if (iconEl) iconEl.setAttribute('icon', isPassword ? 'mdi:eye' : 'mdi:eye-off');
             toggleBtn.setAttribute('aria-label', isPassword ? 'Sembunyikan password' : 'Tampilkan password');
         });
     })();
