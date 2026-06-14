@@ -298,6 +298,7 @@
     if (typeof showGlobalSuccess === 'undefined') window.showGlobalSuccess = (msg) => console.log(msg);
     if (typeof addHistoryItem === 'undefined') window.addHistoryItem = () => {};
     if (typeof getPreviousTodayScanTime === 'undefined') window.getPreviousTodayScanTime = () => '-';
+    if (typeof saveTodayScanTime === 'undefined') window.saveTodayScanTime = () => {};
     
     ensurePetugasLogin();
 
@@ -408,7 +409,23 @@
             throw new Error(result.message || 'Scan gagal. Periksa koneksi backend API.');
         }
 
-        const previousScanDisplay = getPreviousTodayScanTime(petugas.nipp);
+        const scannedNoSarana = result.data.nosarana
+            ?? result.data.no_sarana
+            ?? result.data.noSarana
+            ?? barcodeValue;
+        const scannedIdSarana = result.data.id_sarana
+            ?? result.data.idSarana
+            ?? result.data.sarana_id
+            ?? null;
+        const scanIdentifiers = [
+            barcodeValue,
+            scannedNoSarana,
+            scannedIdSarana,
+            result.data.barcode_value,
+            result.data.barcode,
+            result.data.kode_barcode
+        ];
+        const previousScanDisplay = getPreviousTodayScanTime(scanIdentifiers);
         const historyId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const historyEntry = {
             id: historyId,
@@ -417,16 +434,21 @@
             nama_petugas: petugas.nama ?? '',
             nama_ka: result.data.nama_ka ?? '-',
             gerbong: result.data.stanformasi ?? result.data.gerbong_ka ?? '-',
-            nosarana: result.data.nosarana ?? barcodeValue,
+            barcode_value: barcodeValue,
+            id_sarana: scannedIdSarana,
+            nosarana: scannedNoSarana,
             waktu: result.data.waktu ?? new Date().toISOString(),
             status_laporan: 'Belum Lapor'
         };
 
-        // Tambah history setelah hitung terakhir scan
+        // Ambil terakhir scan dulu, baru simpan scan sekarang sebagai data terakhir untuk barcode/no sarana ini.
         addHistoryItem(historyEntry);
+        saveTodayScanTime(scanIdentifiers, historyEntry.waktu);
 
         localStorage.setItem('scan_result', JSON.stringify({
             ...result.data,
+            nosarana: scannedNoSarana,
+            id_sarana: scannedIdSarana,
             terakhir_scan: previousScanDisplay,
             history_id: historyId
         }));

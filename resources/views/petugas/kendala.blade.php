@@ -661,6 +661,7 @@
         }
 
         setButtonLoading(kendalaSubmitBtn, true, 'Mengirim...');
+        let isKendalaSuccess = false;
 
         const currentLocation = await getCurrentLocation();
 
@@ -714,6 +715,7 @@
                 throw new Error(result.message || 'Gagal mengirim laporan kendala');
             }
 
+            isKendalaSuccess = true;
             showKendalaSuccessModal();
         } catch (error) {
             if (error.message === 'ENDPOINT_KENDALA_NOT_FOUND') {
@@ -723,8 +725,10 @@
             }
             console.error(error);
         } finally {
-            setButtonLoading(kendalaSubmitBtn, false);
-            isKendalaSubmitting = false;
+            if (!isKendalaSuccess) {
+                setButtonLoading(kendalaSubmitBtn, false);
+                isKendalaSubmitting = false;
+            }
         }
     });
 

@@ -362,11 +362,29 @@
             localStorage.setItem('petugas_scan_history', JSON.stringify(items));
         }
 
+        function getLocalDateKey(date = new Date()) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+
         function normalizeDateKey(value) {
             if (!value) return '';
 
+            if (value instanceof Date && !Number.isNaN(value.getTime())) {
+                return getLocalDateKey(value);
+            }
+
             if (typeof value !== 'string') {
                 value = String(value);
+            }
+
+            value = value.trim();
+
+            // ISO dari browser biasanya berakhiran Z/offset timezone. Parse dulu supaya tanggalnya ikut timezone lokal HP/browser.
+            if (/^\d{4}-\d{2}-\d{2}T/.test(value) && /(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+                const date = new Date(value);
+                if (!Number.isNaN(date.getTime())) {
+                    return getLocalDateKey(date);
+                }
             }
 
             if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
@@ -380,7 +398,7 @@
 
             const date = new Date(value);
             if (!Number.isNaN(date.getTime())) {
-                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                return getLocalDateKey(date);
             }
 
             return '';
@@ -468,20 +486,101 @@
             saveHistoryStore(items);
         }
 
-        function getPreviousTodayScanTime(nipp) {
-            const todayKey = normalizeDateKey(new Date().toISOString());
+        function normalizeScanIdentifier(value) {
+            if (value === null || value === undefined) return '';
 
-            const todayScans = getPetugasHistory(nipp).filter(item =>
-                item &&
-                item.type === 'scan' &&
-                normalizeDateKey(item.waktu) === todayKey
-            );
+            return String(value)
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '');
+        }
+
+        function getScanIdentifierCandidates(item) {
+            if (!item) return [];
+
+            return [
+                item.barcode_value,
+                item.barcode,
+                item.kode_barcode,
+                item.nosarana,
+                item.no_sarana,
+                item.id_sarana
+            ].map(normalizeScanIdentifier).filter(Boolean);
+        }
+
+        function flattenScanIdentifiers(values) {
+            return values
+                .flatMap(value => Array.isArray(value) ? value : [value])
+                .map(normalizeScanIdentifier)
+                .filter(Boolean)
+                .filter((value, index, self) => self.indexOf(value) === index);
+        }
+
+        function getLastScanStore() {
+            const parsed = safeJsonParse(localStorage.getItem('petugas_last_scan_by_barcode'), {});
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        }
+
+        function saveLastScanStore(store) {
+            localStorage.setItem('petugas_last_scan_by_barcode', JSON.stringify(store));
+        }
+
+        function getPreviousTodayScanTime(...identifiers) {
+            const todayKey = getLocalDateKey(new Date());
+            const targetIdentifiers = flattenScanIdentifiers(identifiers);
+
+            if (targetIdentifiers.length === 0) {
+                return '-';
+            }
+
+            // Sumber utama: penyimpanan khusus per barcode/no sarana.
+            // Ini lebih stabil daripada baca ulang history yang kadang format key-nya beda.
+            const store = getLastScanStore();
+            const savedMatches = targetIdentifiers
+                .map(identifier => store[identifier])
+                .filter(item => item && item.date === todayKey && item.time);
+
+            if (savedMatches.length > 0) {
+                savedMatches.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+                return formatTimeHHMM(savedMatches[0].time);
+            }
+
+            // Fallback: baca dari history lama kalau user sudah pernah scan sebelum storage khusus dibuat.
+            const todayScans = sortHistoryDesc(getHistoryStore()).filter(item => {
+                if (!item || item.type !== 'scan' || normalizeDateKey(item.waktu) !== todayKey) {
+                    return false;
+                }
+
+                const itemIdentifiers = getScanIdentifierCandidates(item);
+                return targetIdentifiers.some(identifier => itemIdentifiers.includes(identifier));
+            });
 
             if (todayScans.length === 0) {
                 return '-';
             }
 
             return formatTimeHHMM(todayScans[0].waktu);
+        }
+
+        function saveTodayScanTime(identifiers, waktu = null) {
+            const normalizedIdentifiers = flattenScanIdentifiers([identifiers]);
+
+            if (normalizedIdentifiers.length === 0) {
+                return;
+            }
+
+            const timeValue = waktu || new Date().toISOString();
+            const dateKey = normalizeDateKey(timeValue) || getLocalDateKey(new Date());
+            const store = getLastScanStore();
+
+            normalizedIdentifiers.forEach(identifier => {
+                store[identifier] = {
+                    date: dateKey,
+                    time: timeValue
+                };
+            });
+
+            saveLastScanStore(store);
         }
     </script>
 

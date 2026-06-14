@@ -44,6 +44,7 @@
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id') || localStorage.getItem('teknisi_selected_kendala');
     let currentItem = null;
+    let isStartSubmitting = false;
     function authParams() { return new URLSearchParams({ id_user: petugas.id_user || '', nipp: petugas.nipp || '' }); }
     function escapeHtml(value) { return String(value ?? '-').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
     function statusBadge(item) {
@@ -109,6 +110,11 @@
         <div class="card-box"><div class="section-title">Foto Masalah</div>${photoPair(item.foto_url)}</div>`;
     }
     document.getElementById('startBtn').addEventListener('click', async function () {
+        if (isStartSubmitting) {
+            return;
+        }
+        isStartSubmitting = true;
+
         clearGlobalMessages();
         const form = new FormData();
         form.append('id_user', petugas.id_user || '');
@@ -120,7 +126,11 @@
             if (!response.ok || !result.success) throw new Error(result.message || 'Gagal mulai perbaikan');
             localStorage.setItem('teknisi_selected_kendala', String(id));
             window.location.href = '/teknisi?tab=diproses';
-        } catch (error) { showGlobalError(error.message); setButtonLoading(this, false); }
+        } catch (error) {
+            showGlobalError(error.message);
+            isStartSubmitting = false;
+            setButtonLoading(this, false);
+        }
     });
     document.addEventListener('DOMContentLoaded', loadDetail);
 </script>

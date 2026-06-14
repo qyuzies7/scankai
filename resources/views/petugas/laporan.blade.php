@@ -501,6 +501,7 @@
     const laporanSubmitBtn = document.getElementById('laporanSubmitBtn');
 
     let stampedPhotos = [];
+    let isLaporanSubmitting = false;
 
     function formatTanggalIndonesia(value) {
         if (!value || value === '-') return '-';
@@ -724,6 +725,12 @@
 
     document.getElementById('laporanForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        if (isLaporanSubmitting) {
+            return;
+        }
+        isLaporanSubmitting = true;
+
         clearGlobalMessages();
 
         const petugas = JSON.parse(localStorage.getItem('petugas'));
@@ -731,6 +738,7 @@
 
         if (!petugas || !scanResult) {
             showGlobalError('Data petugas atau hasil scan tidak ditemukan.');
+            isLaporanSubmitting = false;
             return;
         }
 
@@ -739,16 +747,19 @@
 
         if (!status) {
             showGlobalError('Pilih kondisi gerbong terlebih dahulu.');
+            isLaporanSubmitting = false;
             return;
         }
 
         if ((status === 'rusak' || status === 'darurat') && !catatan) {
             showGlobalError('Deskripsi wajib untuk status rusak atau darurat');
+            isLaporanSubmitting = false;
             return;
         }
 
         if ((status === 'rusak' || status === 'darurat') && !stampedPhotos.length) {
             showGlobalError('Foto wajib untuk status rusak atau darurat');
+            isLaporanSubmitting = false;
             return;
         }
 
@@ -796,6 +807,8 @@
 
             if (!response.ok || !result.success) {
                 showGlobalError(result.message ?? 'Gagal mengirim laporan');
+                isLaporanSubmitting = false;
+                setButtonLoading(laporanSubmitBtn, false);
                 return;
             }
 
@@ -808,7 +821,7 @@
         } catch (error) {
             showGlobalError('Tidak bisa terhubung ke server backend');
             console.error(error);
-        } finally {
+            isLaporanSubmitting = false;
             setButtonLoading(laporanSubmitBtn, false);
         }
     });

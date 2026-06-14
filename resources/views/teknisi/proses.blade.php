@@ -86,6 +86,7 @@
     const petugas = safeJsonParse(localStorage.getItem('petugas'), {});
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id') || localStorage.getItem('teknisi_selected_kendala');
+    let isFinishSubmitting = false;
     function authParams() { return new URLSearchParams({ id_user: petugas.id_user || '', nipp: petugas.nipp || '' }); }
     function escapeHtml(value) { return String(value ?? '-').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
     function photoPair(value, label) {
@@ -249,10 +250,17 @@
     }
 
     document.getElementById('finishForm').addEventListener('submit', async function (e) {
-        e.preventDefault(); clearGlobalMessages();
+        e.preventDefault();
+
+        if (isFinishSubmitting) {
+            return;
+        }
+        isFinishSubmitting = true;
+
+        clearGlobalMessages();
         const ket = document.getElementById('keterangan_perbaikan').value.trim();
-        if (!ket) { showGlobalError('Keterangan perbaikan wajib diisi.'); return; }
-        if (!fotoFiles.length) { showGlobalError('Foto setelah perbaikan wajib diisi.'); return; }
+        if (!ket) { showGlobalError('Keterangan perbaikan wajib diisi.'); isFinishSubmitting = false; return; }
+        if (!fotoFiles.length) { showGlobalError('Foto setelah perbaikan wajib diisi.'); isFinishSubmitting = false; return; }
 
         const btn = document.getElementById('submitBtn');
         setButtonLoading(btn, true, 'Mengirim...');
@@ -294,8 +302,11 @@
             }
             localStorage.setItem('teknisi_selected_kendala', String(id));
             window.location.href = `/teknisi/detail-selesai?id=${id}`;
-        } catch (error) { showGlobalError(error.message); }
-        finally { setButtonLoading(btn, false); }
+        } catch (error) {
+            showGlobalError(error.message);
+            isFinishSubmitting = false;
+            setButtonLoading(btn, false);
+        }
     });
     
     // show loading state on buttons

@@ -22,7 +22,7 @@
 
     <div id="selesai-summary" class="done-summary" style="display:none;">
         <iconify-icon icon="mdi:check-circle"></iconify-icon>
-        <span id="doneSummaryText">0 perbaikan selesai hari ini</span>
+        <span id="doneSummaryText">Perbaikan selesai hari ini</span>
         <iconify-icon icon="mdi:calendar-month-outline" class="right-icon"></iconify-icon>
     </div>
 
@@ -96,6 +96,55 @@
     }
 
     function normalizeText(value) { return String(value || '').toLowerCase(); }
+
+    function dateKeyFromValue(value) {
+        if (!value) return '';
+        if (value instanceof Date && !Number.isNaN(value.getTime())) {
+            return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+        }
+
+        const raw = String(value).trim();
+        const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+        const numericMatch = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+        if (numericMatch) {
+            const dd = numericMatch[1].padStart(2, '0');
+            const mm = numericMatch[2].padStart(2, '0');
+            return `${numericMatch[3]}-${mm}-${dd}`;
+        }
+
+        const monthMap = {
+            januari: '01', februari: '02', maret: '03', april: '04', mei: '05', juni: '06',
+            juli: '07', agustus: '08', september: '09', oktober: '10', november: '11', desember: '12'
+        };
+        const indoMatch = raw.toLowerCase().match(/(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s+(\d{4})/);
+        if (indoMatch) {
+            return `${indoMatch[3]}-${monthMap[indoMatch[2]]}-${indoMatch[1].padStart(2, '0')}`;
+        }
+
+        const parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) {
+            return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+        }
+
+        return '';
+    }
+
+    function getItemSelesaiDateKey(item) {
+        const dateKeys = ['selesai_at', 'waktu_selesai', 'waktu_selesai_at', 'tanggal_selesai', 'selesai_label', 'updated_at'];
+        for (const key of dateKeys) {
+            const dateKey = dateKeyFromValue(item?.[key]);
+            if (dateKey) return dateKey;
+        }
+        return '';
+    }
+
+    function countTodayDoneItems(items) {
+        const todayKey = dateKeyFromValue(new Date());
+        return (items || []).filter(item => getItemSelesaiDateKey(item) === todayKey).length;
+    }
+
     function isPriority(item) { return Boolean(item.is_prioritas); }
     function isNew(item) {
         // tag baru hanya muncul dalam waktu 24 jam
@@ -148,11 +197,14 @@
             return (a.is_prioritas ? -1 : 1);
         });
 
-        document.getElementById('selesai-summary').style.display = activeStatus === 'selesai' ? 'flex' : 'none';
+        const doneTodayCount = activeStatus === 'selesai' ? countTodayDoneItems(allItems) : 0;
+        document.getElementById('selesai-summary').style.display = activeStatus === 'selesai' && doneTodayCount > 0 ? 'flex' : 'none';
         document.getElementById('tech-tools').style.display = activeStatus === 'selesai' ? 'none' : 'flex';
         // hide priority filter button only on 'diproses'
         document.getElementById('priorityFilter').style.display = activeStatus === 'diproses' ? 'none' : 'inline-flex';
-        if (activeStatus === 'selesai') document.getElementById('doneSummaryText').textContent = `${items.length} perbaikan selesai hari ini`;
+        if (activeStatus === 'selesai' && doneTodayCount > 0) {
+            document.getElementById('doneSummaryText').textContent = `${doneTodayCount} perbaikan selesai hari ini`;
+        }
 
         if (!items.length) {
             list.innerHTML = '<div class="empty-card">Belum ada data.</div>';
